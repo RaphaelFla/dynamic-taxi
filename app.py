@@ -3,8 +3,26 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 
-# --- CONFIGURAÇÃO ---
-st.set_page_config(page_title="Dynamic Drive Pro", page_icon="🚕")
+# 1. Troca o ícone que aparece na aba do navegador e no celular
+st.set_page_config(
+    page_title="Taxi Drive", 
+    page_icon="🚕", 
+    layout="centered"
+)
+
+# 2. ESCONDE A COROA E O MENU (CSS Hack)
+# Esse código "limpa" a sujeira visual do Streamlit
+
+hide_menu_style = """
+        <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        /* Remove o espaço em branco no topo */
+        .block-container {padding-top: 2rem;}
+        </style>
+        """
+st.markdown(hide_menu_style, unsafe_allow_html=True)
 
 # --- BANCO DE DADOS ---
 def init_db():
