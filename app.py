@@ -3,50 +3,34 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 
-# 1. Troca o ícone que aparece na aba do navegador e no celular
+# 1. Configuração de Página (MANTIDO)
 st.set_page_config(
     page_title="Taxi Drive", 
     page_icon="🚕", 
     layout="centered"
 )
 
-# 2. ESCONDE A COROA E O MENU (CSS Hack)
-# Esse código "limpa" a sujeira visual do Streamlit
-
+# 2. ESCONDE A COROA E O MENU (MANTIDO)
 hide_menu_style = """
         <style>
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
-        /* Remove o espaço em branco no topo */
         .block-container {padding-top: 2rem;}
         </style>
         """
 st.markdown(hide_menu_style, unsafe_allow_html=True)
 
-# --- BANCO DE DADOS ---
+# --- BANCO DE DADOS (MANTIDO) ---
 def init_db():
     conn = sqlite3.connect('dynamic_v4.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS caixa (id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, descricao TEXT, valor REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS rotas (id INTEGER PRIMARY KEY AUTOINCREMENT, destino TEXT, preco REAL)''')
     c.execute('''CREATE TABLE IF NOT EXISTS configs (chave TEXT PRIMARY KEY, valor REAL)''')
-    
-    # Inserir Configs Iniciais
-    # 'extra_fixo' agora é em Euros, não mais %
     defaults = [('extra_fixo', 5.0), ('diaria', 59.0), ('diesel', 2.14), ('consumo', 15.0)]
     for k, v in defaults:
         c.execute("INSERT OR IGNORE INTO configs (chave, valor) VALUES (?, ?)", (k, v))
-    
-    # Inserir Suas Rotas Predefinidas
-    c.execute("SELECT COUNT(*) FROM rotas")
-    if c.fetchone()[0] == 0:
-        pre_rotas = [
-            ('Rossio', 20.0), ('Praça do Comércio', 20.0), ('Lx Factory', 18.0),
-            ('Chiado/Bairro Alto', 20.0), ('Castelo S. Jorge', 22.0), ('TimeOut Market', 20.0),
-            ('Colombo', 22.0), ('Mosteiro', 15.0), ('Hippotrip Docas', 15.0), ('Terminal Cruzeiros', 22.0)
-        ]
-        c.executemany("INSERT INTO rotas (destino, preco) VALUES (?, ?)", pre_rotas)
     conn.commit()
     conn.close()
 
@@ -60,148 +44,161 @@ conn = get_db_connection()
 cfg = pd.read_sql_query("SELECT * FROM configs", conn).set_index('chave')['valor'].to_dict()
 conn.close()
 
-# --- INTERFACE ---
-st.title("🚕 Taxi Drive")
+# --- INTERFACE E TRADUÇÃO TOTAL ---
 lang_en = st.sidebar.toggle("English Mode")
 
-tab_calc, tab_caixa, tab_aceite, tab_config = st.tabs([
-    "💰 CALCULATOR / ROUTES", 
-    "📊 MEU CAIXA", 
-    "⛽ COMBUSTIVEL", 
-    "⚙️ CONFIG"
-])
+t = {
+    "aba1": "💰 CALCULATOR / ROUTES" if lang_en else "💰 CALCULADORA / ROTAS",
+    "aba2": "📊 CASH" if lang_en else "📊 MEU CAIXA",
+    "aba3": "⛽ FUEL" if lang_en else "⛽ COMBUSTIVEL",
+    "aba4": "⚙️ CONFIG" if lang_en else "⚙️ CONFIG",
+    "tabela_precos": "Price List" if lang_en else "Tabela de Preços",
+    "sel_destino": "Select Destination" if lang_en else "Selecione o Destino",
+    "viagem_perso": "Custom Trip" if lang_en else "Viagem Personalizada",
+    "distancia": "Distance (KM)" if lang_en else "Distância (KM)",
+    "tempo": "Time (Min)" if lang_en else "Tempo (Min)",
+    "tarifa": "Rate" if lang_en else "Tarifa",
+    "sugerido": "Suggested Price" if lang_en else "Preço Sugerido",
+    "contabilidade": "Accounting" if lang_en else "Contabilidade Pessoal",
+    "ver_dia": "Filter date" if lang_en else "Filtrar por data",
+    "lançar_diaria": "Log Daily" if lang_en else "Lançar Diária",
+    "descricao": "Description" if lang_en else "Descrição",
+    "valor_ajuda": "Value (1245 = 12.45)" if lang_en else "Valor (Ex: 1245 para 12.45)",
+    "registrar": "Register" if lang_en else "Registrar",
+    "saldo_dia": "Balance" if lang_en else "Saldo em",
+    "custo_comb": "Fuel Cost" if lang_en else "Custo de combustível",
+    "config_app": "Settings" if lang_en else "Configurações do App",
+    "add_rota": "Add New Route" if lang_en else "Adicionar Nova Rota",
+    "gerenciar_rotas": "Manage Routes" if lang_en else "Gerenciar Rotas Fixas",
+    "salvar": "Save" if lang_en else "Salvar",
+    "apagar": "Delete" if lang_en else "Deletar"
+}
 
-# --- ABA 1: CALCULADORA E ROTAS (CLIENTE) ---
+tab_calc, tab_caixa, tab_aceite, tab_config = st.tabs([t["aba1"], t["aba2"], t["aba3"], t["aba4"]])
+
+# --- ABA 1: CALCULADORA ---
 with tab_calc:
-    st.subheader("Price List / Tabela de Preços" if lang_en else "Tabela de Preços")
-    
+    st.subheader(t["tabela_precos"])
     conn = get_db_connection()
     df_rotas = pd.read_sql_query("SELECT * FROM rotas ORDER BY destino", conn)
     conn.close()
-    
     if not df_rotas.empty:
-        rota_sel = st.selectbox("Select Destination / Selecione o Destino", df_rotas['destino'].tolist())
+        rota_sel = st.selectbox(t["sel_destino"], df_rotas['destino'].tolist())
         p_exibicao = df_rotas[df_rotas['destino'] == rota_sel]['preco'].values[0]
-        st.markdown(f"<h1 style='text-align: center; color: #4CAF50; font-size: 60px;'>€{p_exibicao:.2f}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align: center; color: #4CAF50;'>€{p_exibicao:.2f}</h1>", unsafe_allow_html=True)
 
     st.divider()
-    
-    st.subheader("Custom Trip / Viagem Personalizada" if lang_en else "Viagem Personalizada")
+    st.subheader(t["viagem_perso"])
     col1, col2 = st.columns(2)
-    dist_m = col1.number_input("Distance (KM)" if lang_en else "Distância (KM)", min_value=0.0)
-    tempo_m = col2.number_input("Time (Min)" if lang_en else "Tempo (Min)", min_value=0)
-    
-    tarifa = st.selectbox("Rate / Tarifa", ["Day / Dia (Tarifa 1)", "Night-Weekend / Noite-FDS (Tarifa 2)"])
-    band = 3.25 if "Day" in tarifa or "Dia" in tarifa else 3.90
-    km_rate = 0.67 if "Day" in tarifa or "Dia" in tarifa else 0.80
-    time_rate = 16.50 if "Day" in tarifa or "Dia" in tarifa else 19.80
-    
-    # Cálculo Oficial + ADICIONAL EM VALOR FIXO (€)
-    val_oficial = band + (dist_m * km_rate) + ((tempo_m / 60) * time_rate)
-    val_final_calc = val_oficial + cfg['extra_fixo']
-    
-    label_sugerido = "Suggested Price" if lang_en else "Preço Sugerido"
-    st.markdown(f"<h3 style='text-align: center; margin-top: 20px;'>{label_sugerido}</h3>", unsafe_allow_html=True)
-    st.markdown(f"<h1 style='text-align: center; color: #4CAF50; font-size: 60px;'>€{round(val_final_calc, 0)}</h1>", unsafe_allow_html=True)
+    dist_m = col1.number_input(t["distancia"], min_value=0.0)
+    tempo_m = col2.number_input(t["tempo"], min_value=0)
+    opcoes_tarifa = ["Day (T1)", "Night/Wkd (T2)"] if lang_en else ["Dia (T1)", "Noite-FDS (T2)"]
+    tarifa_sel = st.selectbox(t["tarifa"], opcoes_tarifa)
+    band = 3.25 if "Day" in tarifa_sel or "Dia" in tarifa_sel else 3.90
+    km_rate = 0.67 if "Day" in tarifa_sel or "Dia" in tarifa_sel else 0.80
+    time_rate = 16.50 if "Day" in tarifa_sel or "Dia" in tarifa_sel else 19.80
+    val_final_calc = band + (dist_m * km_rate) + ((tempo_m / 60) * time_rate) + cfg['extra_fixo']
+    st.markdown(f"<h3 style='text-align: center;'>{t['sugerido']}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; color: #4CAF50;'>€{round(val_final_calc, 0)}</h1>", unsafe_allow_html=True)
 
 # --- ABA 2: MEU CAIXA ---
 with tab_caixa:
-    st.subheader("Contabilidade Pessoal")
-    
-    if st.button("Lançar Diária de Hoje (€" + str(cfg['diaria']) + ")"):
+    st.subheader(t["contabilidade"])
+    data_sel = st.date_input(t["ver_dia"], datetime.now().date(), format="DD/MM/YYYY")
+    data_str = data_sel.strftime("%Y-%m-%d")
+
+    if st.button(f"{t['lançar_diaria']} (€{cfg['diaria']})"):
         conn = get_db_connection()
         conn.execute("INSERT INTO caixa (data, descricao, valor) VALUES (?, ?, ?)", 
-                    (datetime.now().strftime("%Y-%m-%d"), "Custo Diária", -cfg['diaria']))
+                    (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "Custo Diária", -cfg['diaria']))
         conn.commit()
         conn.close()
         st.rerun()
 
-    with st.form("add_caixa"):
-        desc = st.text_input("Descrição")
-        val = st.number_input("Valor (€)", format="%.2f", help="Negativo para gastos")
-        if st.form_submit_button("Registrar"):
+    with st.form("add_caixa", clear_on_submit=True):
+        f_desc = st.text_input(t["descricao"])
+        f_val = st.text_input(t["valor_ajuda"])
+        if st.form_submit_button(t["registrar"]):
+            if f_val:
+                v_conv = float(f_val) / 100
+                conn = get_db_connection()
+                conn.execute("INSERT INTO caixa (data, descricao, valor) VALUES (?, ?, ?)", 
+                            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), f_desc, v_conv))
+                conn.commit()
+                conn.close()
+                st.rerun()
+
+    conn = get_db_connection()
+    df_c = pd.read_sql_query(f"SELECT * FROM caixa WHERE data LIKE '{data_str}%' ORDER BY id DESC", conn)
+    conn.close()
+    st.metric(f"{t['saldo_dia']} {data_sel.strftime('%d/%m/%Y')}", f"€{df_c['valor'].sum():.2f}")
+    for i, row in df_c.iterrows():
+        c1, c2, c3 = st.columns([2, 1, 0.5])
+        hora = row['data'][11:16] if len(row['data']) > 10 else "--:--"
+        c1.write(f"**{row['descricao']}**")
+        c1.caption(f"🕒 {hora}")
+        cor = "green" if row['valor'] > 0 else "red"
+        c2.write(f":{cor}[€{row['valor']:.2f}]")
+        if c3.button("🗑️", key=f"del_{row['id']}"):
             conn = get_db_connection()
-            conn.execute("INSERT INTO caixa (data, descricao, valor) VALUES (?, ?, ?)", 
-                        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), desc, val))
+            conn.execute("DELETE FROM caixa WHERE id=?", (row['id'],))
             conn.commit()
             conn.close()
             st.rerun()
+        st.divider()
 
-    df_caixa = pd.read_sql_query(f"SELECT descricao, valor FROM caixa WHERE data LIKE '{datetime.now().strftime('%Y-%m-%d')}%'", get_db_connection())
-    st.metric("Saldo Real Hoje", f"€{df_caixa['valor'].sum():.2f}")
-    st.table(df_caixa)
-    
-    if st.button("LIMPAR CAIXA (HOJE)"):
-        conn = get_db_connection()
-        conn.execute("DELETE FROM caixa WHERE data LIKE ?", (datetime.now().strftime("%Y-%m-%d") + "%",))
-        conn.commit()
-        conn.close()
-        st.rerun()
-
-# --- ABA 3: ACEITE ---
+# --- ABA 3: COMBUSTÍVEL ---
 with tab_aceite:
-    st.subheader("Custo de combustível")
-    dist_a = st.number_input("KM totais", min_value=0.1, key="a_km")
-    tempo_a = st.number_input("Tempo total (min)", min_value=1, key="a_min")
-    
-    custo_d = dist_a * (cfg['diesel'] / cfg['consumo'])
-    min_aceite = custo_d + ((tempo_a / 60) * 20)
-    
-    st.header(f"Custo combustível: €{custo_d:.2f}")
+    st.subheader(t["custo_comb"])
+    dist_a = st.number_input(t["distancia"], min_value=0.0, step=0.1)
+    p_dies = st.number_input("Diesel (€)", value=cfg['diesel'], step=0.01)
+    c_car = st.number_input("Consumo (KM/L)", value=cfg['consumo'], step=0.1)
+    if c_car > 0:
+        st.header(f"Total: €{(dist_a * (p_dies / c_car)):.2f}")
 
 # --- ABA 4: CONFIG ---
 with tab_config:
-    st.subheader("Configurações do App")
-    with st.form("cfg_form"):
-        new_extra = st.number_input("Adicional Fixo na Calculadora (€)", value=cfg['extra_fixo'])
-        new_diaria = st.number_input("Valor da Diária (€)", value=cfg['diaria'])
-        new_diesel = st.number_input("Preço do Gasóleo (€)", value=cfg['diesel'])
-        if st.form_submit_button("Salvar Tudo"):
+    st.subheader(t["config_app"])
+    with st.form("cfg_f"):
+        ne = st.number_input("Extra (€)", value=cfg['extra_fixo'])
+        nd = st.number_input("Daily (€)", value=cfg['diaria'])
+        ng = st.number_input("Diesel (€)", value=cfg['diesel'])
+        nc = st.number_input("Consumo (KM/L)", value=cfg['consumo'])
+        if st.form_submit_button(t["salvar"]):
             conn = get_db_connection()
-            conn.execute("UPDATE configs SET valor = ? WHERE chave = 'extra_fixo'", (new_extra,))
-            conn.execute("UPDATE configs SET valor = ? WHERE chave = 'diaria'", (new_diaria,))
-            conn.execute("UPDATE configs SET valor = ? WHERE chave = 'diesel'", (new_diesel,))
+            for k, v in [('extra_fixo', ne), ('diaria', nd), ('diesel', ng), ('consumo', nc)]:
+                conn.execute("UPDATE configs SET valor = ? WHERE chave = ?", (v, k))
             conn.commit()
             conn.close()
             st.rerun()
-            
-    st.divider()
-    
-    # --- NOVA FUNÇÃO: CADASTRAR NOVA ROTA ---
-    st.subheader("➕ Adicionar Nova Rota")
-    with st.form("form_nova_rota"):
-        c_dest, c_prec = st.columns([2, 1])
-        n_dest = c_dest.text_input("Nome do Destino (Ex: Aeroporto)")
-        n_prec = c_prec.number_input("Preço Fixo (€)", min_value=0.0, step=1.0)
-        
-        if st.form_submit_button("CADASTRAR ROTA"):
-            if n_dest: # Só salva se tiver nome
-                conn = get_db_connection()
-                conn.execute("INSERT INTO rotas (destino, preco) VALUES (?, ?)", (n_dest, n_prec))
-                conn.commit()
-                conn.close()
-                st.success(f"Rota para {n_dest} adicionada!")
-                st.rerun()
-            else:
-                st.error("Por favor, digite o nome do destino.")
 
     st.divider()
-    
-    # --- GERENCIAR EXISTENTES ---
-    st.subheader("Gerenciar Rotas Fixas")
-    df_edit = pd.read_sql_query("SELECT * FROM rotas", get_db_connection())
-    for i, r in df_edit.iterrows():
-        with st.expander(f"Editar: {r['destino']}"):
-            n_name = st.text_input("Destino", value=r['destino'], key=f"n{r['id']}")
-            n_price = st.number_input("Preço", value=r['preco'], key=f"p{r['id']}")
-            c1, c2 = st.columns(2)
-            if c1.button("Salvar", key=f"up{r['id']}"):
+    st.subheader(t["add_rota"])
+    with st.form("add_r"):
+        rd = st.text_input("Destination" if lang_en else "Destino")
+        rp = st.number_input("Price" if lang_en else "Preço", min_value=0.0)
+        if st.form_submit_button(t["registrar"]):
+            if rd:
                 conn = get_db_connection()
-                conn.execute("UPDATE rotas SET destino=?, preco=? WHERE id=?", (n_name, n_price, r['id']))
+                conn.execute("INSERT INTO rotas (destino, preco) VALUES (?, ?)", (rd, rp))
                 conn.commit()
                 conn.close()
                 st.rerun()
-            if c2.button("Deletar", key=f"del{r['id']}"):
+
+    st.subheader(t["gerenciar_rotas"])
+    df_r = pd.read_sql_query("SELECT * FROM rotas ORDER BY destino", get_db_connection())
+    for i, r in df_r.iterrows():
+        with st.expander(f"{r['destino']} - €{r['preco']:.2f}"):
+            ndest = st.text_input("Name", value=r['destino'], key=f"rd{r['id']}")
+            nprec = st.number_input("Value", value=r['preco'], key=f"rp{r['id']}")
+            ca, cb = st.columns(2)
+            if ca.button(t["salvar"], key=f"sv{r['id']}"):
+                conn = get_db_connection()
+                conn.execute("UPDATE rotas SET destino=?, preco=? WHERE id=?", (ndest, nprec, r['id']))
+                conn.commit()
+                conn.close()
+                st.rerun()
+            if cb.button(t["apagar"], key=f"ap{r['id']}"):
                 conn = get_db_connection()
                 conn.execute("DELETE FROM rotas WHERE id=?", (r['id'],))
                 conn.commit()
