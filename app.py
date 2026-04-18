@@ -2,6 +2,12 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from datetime import datetime
+import os
+import time
+
+os.environ['TZ'] = 'Europe/Lisbon'
+if hasattr(time, 'tzset'):
+    time.tzset()
 
 # 1. Configuração de Página (MANTIDO)
 st.set_page_config(
@@ -46,6 +52,8 @@ conn.close()
 
 # --- INTERFACE E TRADUÇÃO TOTAL ---
 lang_en = st.sidebar.toggle("English Mode")
+
+st.title("🚕 Taxi Drive")
 
 t = {
     "aba1": "💰 CALCULATOR / ROUTES" if lang_en else "💰 CALCULADORA / ROTAS",
